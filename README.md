@@ -4,7 +4,7 @@ A single-file React app I built with Claude (Anthropic) to run my actual home ga
 
 **Stack:** React 18 (single file, ~3,900 lines), Tailwind CSS, `window.storage` for persistence, no build step, no dependencies. Mobile-responsive. Lives inside [Claude Artifacts](https://claude.ai) so it stays editable as the garden evolves — but the same code runs anywhere React runs.
 
-**Live demo:** https://claude.ai/public/artifacts/7c30f400-b543-4df6-b6a7-52d8323c1cf0
+**Live demo:** https://claude.ai/artifact/49ysat4jy87DDJYFbYKTye
 
 **Built with:** Claude Opus (Anthropic). Vibe-coded over months while solving real garden problems in parallel.
 
@@ -229,7 +229,7 @@ This is the work product of someone who can use AI as a thinking and execution s
 
 ### View my live version
 
-https://claude.ai/public/artifacts/7c30f400-b543-4df6-b6a7-52d8323c1cf0
+https://claude.ai/artifact/49ysat4jy87DDJYFbYKTye
 
 This runs my actual garden data — Belmont CA, real measurements, real schedules. View-only unless you fork.
 
