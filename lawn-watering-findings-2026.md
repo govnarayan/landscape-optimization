@@ -86,7 +86,7 @@ Govind's recollection was no seasonal adjustment in Jun to Aug. The emails show 
 
 ## Later changes (2026-11-04)
 
-1. Backyard is now sized on the average can, not the driest can: about 30 min per zone every 4 days in June (25 in July and August), instead of 35. Govind judged 35 too high. Frontyard middle stays on its driest can with the 1.25 site factor, and frontyard side on its two driest cans, capped at 30 min.
+1. Backyard is now sized on the average can, not the driest can: about 30 min per zone every 4 days in June (25 in July and August), instead of 35. Govind judged 35 too high. Frontyard middle stays on its driest can with the 1.25 site factor, and frontyard side follows the middle (see the correction below).
 2. Warm stretches this summer (modeled highs, not a station): Jun 10-13 (82, 92, 80, 77), Jul 12-15, Aug 1-4 (78, 81, 82, 76), Sep 7-10 (up to 93), Sep 29 to Oct 8 (10 days at 78-91). Weekly evaporation in those stretches ran 10 to 35% over the month's norm. Rachio cut August by about 15% on Aug 1, the first day of the Aug 1-4 stretch.
 3. The first-of-month check and the warm-spell rule are done in Rachio, since that is the operating app. The garden app only states them.
 
