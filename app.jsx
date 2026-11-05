@@ -427,7 +427,7 @@ const LAWN_DATA = {
       notes: [
         'Catches about a third of the water per minute that the middle zone does (DU 45%). It browned in 2026 at the original 2 x 6, and again at 3 x 6.',
         'The old note here said to trust the lawn and keep close to current. That was wrong: the lawn did not hold up.',
-        'The math wants 60-80 min per run at peak, which would run off. The schedule caps at 30 min, so a Rachio overlay cannot close this gap. It needs hand-watering, or a nozzle and head fix.',
+        'The math wants 60-80 min per run at peak, which would run off. The schedule holds the June peak at 30 min and scales the other months down from it, so a Rachio overlay cannot close this gap. It needs hand-watering, or a nozzle and head fix.',
         'Cans may under-read here (curb rebound, slope), so treat the 30-min cap as a floor and watch the lawn.',
       ],
       status: 'structural-limit',
@@ -453,16 +453,24 @@ function lawnDesignRate(zone) {
 
 function computeLawnMonthly(zone) {
   const rate = lawnDesignRate(zone);
+  const rawFor = m => {
+    const f = LAWN_TARGET_INCHES_PER_WEEK * ETO_FACTOR_BY_MONTH[m];
+    return (f * zone.siteFactor * lawnIntervalDays(f) / 7) / rate;
+  };
+  // A zone that cannot take its full need without runoff (maxRunMin) runs its June peak at the cap,
+  // and every other month scales down from that peak, so the season still shows.
+  const peakRaw = rawFor(5);
+  const capScale = zone.maxRunMin && peakRaw > zone.maxRunMin ? zone.maxRunMin / peakRaw : 1;
   return Object.keys(ETO_FACTOR_BY_MONTH).map(k => {
     const m = Number(k);
     const needWk = LAWN_TARGET_INCHES_PER_WEEK * ETO_FACTOR_BY_MONTH[m] * zone.siteFactor;
     const days = lawnIntervalDays(LAWN_TARGET_INCHES_PER_WEEK * ETO_FACTOR_BY_MONTH[m]);
-    const rawMin = (needWk * days / 7) / rate;
-    const capped = zone.maxRunMin ? rawMin > zone.maxRunMin : false;
-    const runMin = capped ? zone.maxRunMin : rawMin;
+    const rawMin = rawFor(m);
+    const capped = capScale < 1;
+    const runMin = rawMin * capScale;
     const cycles = Math.max(1, Math.ceil(runMin / LAWN_MAX_CYCLE_MIN));
     const per = Math.round(runMin / cycles);
-    return { m, needWk, days, rawMin, capped, cycles, per, total: cycles * per };
+    return { m, needWk, days, rawMin, capped, capShare: capScale, cycles, per, total: cycles * per };
   });
 }
 
@@ -2846,7 +2854,7 @@ function LawnWateringSection() {
                     const r = z.monthly[i];
                     return (
                       <td key={z.id} className="py-1.5 pr-3 num">
-                        {r.total} min <span className="text-stone-500">({r.cycles} × {r.per})</span>{r.capped ? <span className="text-rose-700"> cap</span> : null}
+                        {r.total} min <span className="text-stone-500">({r.cycles} × {r.per})</span>{r.capped ? <span className="text-rose-700"> ({Math.round(r.capShare * 100)}% of need)</span> : null}
                       </td>
                     );
                   })}
@@ -2856,7 +2864,7 @@ function LawnWateringSection() {
           </table>
         </div>
         <div className="text-[11px] text-stone-600 mt-2 max-w-3xl">
-          "cap" means the math wants more than the zone can take without running off. Frontyard side is the one: no Rachio setting closes it, so it needs hand-watering or a nozzle and head fix. Frontyard middle carries a 1.25 site factor fitted to its 2026 failure; it is a placeholder to check next summer.
+          A "% of need" tag means the math wants more water than the zone can take without running off. Frontyard side is the one: its June peak is held at 30 min and every other month scales down from that, so it always gets only about 38% of what the lawn needs. No Rachio setting closes that gap, so it needs hand-watering or a nozzle and head fix. Frontyard middle carries a 1.25 site factor fitted to its 2026 failure; it is a placeholder to check next summer.
         </div>
       </div>
 

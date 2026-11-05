@@ -81,7 +81,7 @@ Govind's recollection was no seasonal adjustment in Jun to Aug. The emails show 
 1. Peak target raised from 0.75 to 1.1 in/wk (modeled June ET0 1.34 x Kc 0.8).
 2. Runs are sized to the driest can (backyard, front middle) or the two driest (front side), not the average.
 3. Front middle carries a 1.25 site factor fitted to its 2026 failure. It is a placeholder, not a measurement.
-4. Front side is capped at 30 min per run. The math wants 60 to 80, which would run off, so it needs hand-watering or a head fix. The old note to trust the lawn was wrong.
+4. Front side holds its June peak at 30 min per run and scales the other months down from it (Nov 15, Jan 20). The math wants 42 to 80 min, which would run off, so it always gets only about 38% of need and needs hand-watering or a head fix. The old note to trust the lawn was wrong.
 5. The reality check shows Jun to Aug at 51 to 54% of need for the backyard and 64 to 69% for front middle, which matches where it browned.
 
 ## Later changes (2026-11-04)
