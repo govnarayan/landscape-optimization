@@ -81,7 +81,7 @@ Govind's recollection was no seasonal adjustment in Jun to Aug. The emails show 
 1. Peak target raised from 0.75 to 1.1 in/wk (modeled June ET0 1.34 x Kc 0.8).
 2. Runs are sized to the driest can (backyard, front middle) or the two driest (front side), not the average.
 3. Front middle carries a 1.25 site factor fitted to its 2026 failure. It is a placeholder, not a measurement.
-4. Front side holds its June peak at 30 min per run and scales the other months down from it (Nov 15, Jan 20). The math wants 42 to 80 min, which would run off, so it always gets only about 38% of need and needs hand-watering or a head fix. The old note to trust the lawn was wrong.
+4. Front side is sized like front middle (same minutes, spacing and 1.25 factor). Its cans read about a third as high, but Govind observed it doing slightly better than the middle at equal minutes all summer, so the cans under-read it (curb rebound, slope, clay storage). An earlier version of the app capped it at 30 min and called it 38% of need. That was wrong and was removed.
 5. The reality check shows Jun to Aug at 51 to 54% of need for the backyard and 64 to 69% for front middle, which matches where it browned.
 
 ## Later changes (2026-11-04)
@@ -102,3 +102,8 @@ Rachio does shift the planters, but only slightly. Back Planters: 12 min in Jun 
 | Nov | 299% | 288% |
 
 Both planters ran at or above need from June and far above it by October, which matches the wet soil Govind found in the front in early November. The back planter on a 3-day spacing is the larger surprise, though the weak bubbler pressure may mean less water arrives than Moen Flo measures. The app now recommends turning the front planter off from November to February and probing before restarting, and stopping the front tree bags until April.
+
+
+## Correction on frontyard side (2026-11-04)
+
+Govind: front side has consistently done slightly better than front middle. That contradicts the catch cans and overturns the claim that it was the most starved zone. Its early browning at 2 x 6 is still true, so 12 min every 5 days is too little in summer. The app now treats side and middle the same.

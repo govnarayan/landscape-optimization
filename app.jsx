@@ -412,9 +412,10 @@ const LAWN_DATA = {
       area: 250,
       readings: [0.6, 1.0, 1.4, 2.3],
       moenFloGross7min: 63,
-      designBasis: 'lowHalf',   // lowest 2 cans: the single lowest can (0.6) is a curb-rebound outlier
-      siteFactor: 1.0,
-      maxRunMin: 30,
+      designBasis: 'min',
+      rateFrom: 'fy-middle',    // cans under-read this zone (curb rebound, slope); size it like the middle zone
+      siteFactor: 1.25,         // same placeholder as the middle zone
+      maxRunMin: null,
       ran2026: [
         { m: 5, label: 'Jun', mins: 24, days: 5 },
         { m: 6, label: 'Jul', mins: 24, days: 5 },
@@ -425,12 +426,12 @@ const LAWN_DATA = {
       ],
       currentSchedule: { mins: 11, intervalDays: 5 },
       notes: [
-        'Catches about a third of the water per minute that the middle zone does (DU 45%). It browned in 2026 at the original 2 x 6, and again at 3 x 6.',
-        'The old note here said to trust the lawn and keep close to current. That was wrong: the lawn did not hold up.',
-        'The math wants 60-80 min per run at peak, which would run off. The schedule holds the June peak at 30 min and scales the other months down from it, so a Rachio overlay cannot close this gap. It needs hand-watering, or a nozzle and head fix.',
-        'Cans may under-read here (curb rebound, slope), so treat the 30-min cap as a floor and watch the lawn.',
+        'The cans catch only about a third of what the middle zone catches (DU 45%), but in 2026 this zone did slightly better than the middle at the same minutes. So the cans under-read it: curb rebound, slope and clay storage deliver water that upright cans do not catch.',
+        'It is sized like the middle zone: same minutes, same spacing, same 1.25 factor. If you see it do worse than the middle, split its schedule out again.',
+        'Early on it browned at 2 x 6 (12 min every 5 days) and recovered at 3 x 6, so 12 min is too little in summer.',
+        'Cannot be fixed by sprinkler heads: the layout is irregular and the minimum head spacing blocks adding any.',
       ],
-      status: 'structural-limit',
+      status: 'fixable',
     },
   ],
 };
@@ -445,6 +446,7 @@ function lawnIntervalDays(needInPerWk) {
 
 // Inches per minute used to size the run. 'avg' = average can; 'min' = driest can; 'lowHalf' = average of the 2 driest cans.
 function lawnDesignRate(zone) {
+  if (zone.rateFrom) return lawnDesignRate(LAWN_DATA.zones.find(z => z.id === zone.rateFrom));
   const perMin = zone.readings.map(oz => (oz * 1.8047) / LAWN_CONTAINER_AREA_SQIN / 7);
   const sorted = [...perMin].sort((a, b) => a - b);
   if (zone.designBasis === 'avg') return perMin.reduce((x, y) => x + y, 0) / perMin.length;
@@ -2824,7 +2826,7 @@ function LawnWateringSection() {
       <div>
         <div className="display text-xl md:text-2xl mb-2">Lawn watering — measured + planned</div>
         <div className="text-xs md:text-sm text-stone-600 mb-4 max-w-3xl">
-          Based on catch-can test (4 containers, 13cm × 13cm, 7-min cycle) cross-referenced with Moen Flo whole-house consumption data. Each zone has different characteristics and a tailored schedule. Peak target: <span className="font-semibold num">{LAWN_TARGET_INCHES_PER_WEEK}"/wk</span> effective in June, scaled down by month. Raised from 0.75 after summer 2026, when the lawn browned. Backyard is sized on the average can, frontyard middle on its driest can, and frontyard side on its two driest.
+          Based on catch-can test (4 containers, 13cm × 13cm, 7-min cycle) cross-referenced with Moen Flo whole-house consumption data. Each zone has different characteristics and a tailored schedule. Peak target: <span className="font-semibold num">{LAWN_TARGET_INCHES_PER_WEEK}"/wk</span> effective in June, scaled down by month. Raised from 0.75 after summer 2026, when the lawn browned. Backyard is sized on the average can and frontyard middle on its driest can. Frontyard side follows the middle, because its cans under-read it.
         </div>
       </div>
 
@@ -2864,7 +2866,7 @@ function LawnWateringSection() {
           </table>
         </div>
         <div className="text-[11px] text-stone-600 mt-2 max-w-3xl">
-          A "% of need" tag means the math wants more water than the zone can take without running off. Frontyard side is the one: its June peak is held at 30 min and every other month scales down from that, so it always gets only about 38% of what the lawn needs. No Rachio setting closes that gap, so it needs hand-watering or a nozzle and head fix. Frontyard middle carries a 1.25 site factor fitted to its 2026 failure; it is a placeholder to check next summer.
+          Frontyard middle carries a 1.25 site factor fitted to its 2026 failure; it is a placeholder to check next summer. Frontyard side is sized like the middle: its cans read a third as high, but the lawn did slightly better than the middle at the same minutes, so the cans under-read it.
         </div>
       </div>
 
@@ -2969,7 +2971,7 @@ function LawnWateringSection() {
           </table>
         </div>
         <div className="text-[11px] text-stone-600 mt-2 max-w-3xl">
-          Rachio cut August by about 15% (75 to 64 min total for the back, 48 to 40 for the front) while the lawn was already behind from July. Sizing uses the average can for the backyard, the driest can for frontyard middle, and the two driest for the side.
+          Rachio cut August by about 15% (75 to 64 min total for the back, 48 to 40 for the front) while the lawn was already behind from July. Sizing uses the average can for the backyard and the driest can for frontyard middle. The side uses the middle's rate, so its percentages repeat the middle's.
         </div>
       </div>
 
