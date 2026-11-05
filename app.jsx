@@ -370,9 +370,9 @@ const LAWN_DATA = {
         { m: 7, label: 'Aug', mins: 21, days: 5 },
         { m: 8, label: 'Sep', mins: 21, days: 4 },
         { m: 9, label: 'Oct', mins: 17, days: 4 },
-        { m: 10, label: 'Nov', mins: 10, days: 4 },
+        { m: 10, label: 'Nov', mins: 10, days: 5 },
       ],
-      currentSchedule: { mins: 10, intervalDays: 4 },
+      currentSchedule: { mins: 10, intervalDays: 5 },
       notes: [
         'Visible runoff begins ~30 min after 7-min cycles. Water exits via French drains + sump pump to road. Keep cycles at 6 min or less and let Rachio soak between them.',
         'Summer 2026: ran 25 min per zone every 5 days in Jun-Jul and 21 in Aug, which reached an average spot at about 70% of need and the driest can at about half. Brown patches followed in the low-coverage spots, and hand-watering covered them.',
@@ -395,9 +395,9 @@ const LAWN_DATA = {
         { m: 7, label: 'Aug', mins: 20, days: 5 },
         { m: 8, label: 'Sep', mins: 20, days: 4 },
         { m: 9, label: 'Oct', mins: 16, days: 4 },
-        { m: 10, label: 'Nov', mins: 11, days: 4 },
+        { m: 10, label: 'Nov', mins: 11, days: 5 },
       ],
-      currentSchedule: { mins: 11, intervalDays: 4 },
+      currentSchedule: { mins: 11, intervalDays: 5 },
       notes: [
         'Worst zone in Aug-Sep 2026: a dead ring and browning in 5 places, even with heavy hand-watering. Its average catch-can reading is the highest of the three, so the cans alone do not explain it.',
         'Cans here range 2.8 to 5.6 fl oz (DU 69%). The ring probably sits in a spot none of the 4 cans sampled, or this zone loses more water to sun and heat than the others.',
@@ -421,9 +421,9 @@ const LAWN_DATA = {
         { m: 7, label: 'Aug', mins: 20, days: 5 },
         { m: 8, label: 'Sep', mins: 20, days: 4 },
         { m: 9, label: 'Oct', mins: 16, days: 4 },
-        { m: 10, label: 'Nov', mins: 11, days: 4 },
+        { m: 10, label: 'Nov', mins: 11, days: 5 },
       ],
-      currentSchedule: { mins: 11, intervalDays: 4 },
+      currentSchedule: { mins: 11, intervalDays: 5 },
       notes: [
         'Catches about a third of the water per minute that the middle zone does (DU 45%). It browned in 2026 at the original 2 x 6, and again at 3 x 6.',
         'The old note here said to trust the lawn and keep close to current. That was wrong: the lawn did not hold up.',
@@ -532,14 +532,14 @@ const PLANTER_DATA = {
       offBelow: 0.25,                // month factor under which the bed runs on rain, probe first
       // Spacing by month factor: [factor at or above, days]
       spacing: [[0.8, 3], [0.5, 4], [0.3, 5], [0, 7]],
-      // Rachio runtime per run (min), from the monthly Seasonal Shift emails. Spacing is the app's earlier entry; verify in Rachio.
+      // Rachio runtime per run (min), from the monthly Seasonal Shift emails. Spacing is what Rachio shows on 2026-11-04 (every 3 days), assumed for earlier months.
       ran2026: [
-        { m: 5, label: 'Jun', mins: 12, days: 4 },
-        { m: 6, label: 'Jul', mins: 12, days: 4 },
-        { m: 7, label: 'Aug', mins: 10, days: 4 },
-        { m: 8, label: 'Sep', mins: 10, days: 4 },
-        { m: 9, label: 'Oct', mins: 10, days: 4 },
-        { m: 10, label: 'Nov', mins: 10, days: 4 },
+        { m: 5, label: 'Jun', mins: 12, days: 3 },
+        { m: 6, label: 'Jul', mins: 12, days: 3 },
+        { m: 7, label: 'Aug', mins: 10, days: 3 },
+        { m: 8, label: 'Sep', mins: 10, days: 3 },
+        { m: 9, label: 'Oct', mins: 10, days: 3 },
+        { m: 10, label: 'Nov', mins: 10, days: 3 },
       ],
       notes: [
         'Fast-draining soil: 25-40% loss to deep percolation past root zone is the main inefficiency.',
@@ -3223,7 +3223,7 @@ function PlanterWateringSection() {
       <div className="border border-sky-300 rounded-sm bg-sky-50/60 p-4 md:p-5">
         <div className="display text-lg mb-1 text-sky-900">Rachio overlay: where its shift runs too high or too low</div>
         <div className="text-xs text-stone-700 mb-3 max-w-3xl">
-          Rachio does shift the planters, but only a little: back from 12 to 10 min, front from 16 to 11, while the need fell about 70%. Type in what Rachio shows on the 1st to check the current month. A "?" means that month has not been seen yet.
+          Rachio does shift the planters, but only a little: back from 12 to 10 min, front from 16 to 11, while the need fell about 70%. Type in what Rachio shows on the 1st to check the current month. A "?" means that month has not been seen yet. Spacing matters as much as minutes: on Nov 4 Rachio still has the back planters every 3 days, and the monthly table wants every 5 days or off.
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
           {zones.map(z => (
@@ -3278,7 +3278,7 @@ function PlanterWateringSection() {
       {/* 2026 reality check */}
       <div className="border border-stone-300 rounded-sm bg-white p-4 md:p-5">
         <div className="display text-lg mb-1">2026 reality check: what you ran vs what the beds needed</div>
-        <div className="text-xs text-stone-600 mb-3 max-w-3xl">Effective water delivered each week against that month's need. Spacing is the app's earlier entry (back 4 days, front 5), so confirm it in Rachio. Over 130% is overwatering.</div>
+        <div className="text-xs text-stone-600 mb-3 max-w-3xl">Effective water delivered each week against that month's need. Spacing is what Rachio shows on Nov 4 (back every 3 days, front every 5) and is assumed for earlier months. Over 130% is overwatering.</div>
         <div className="overflow-x-auto">
           <table className="w-full text-xs md:text-sm border-collapse min-w-[460px]">
             <thead>

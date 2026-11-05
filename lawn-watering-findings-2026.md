@@ -92,13 +92,13 @@ Govind's recollection was no seasonal adjustment in Jun to Aug. The emails show 
 
 ## Planters (Rachio emails, read 2026-11-04)
 
-Rachio does shift the planters, but only slightly. Back Planters: 12 min in Jun and Jul, 10 min from Aug. Front Planters: 16 in Jun and Jul, 13 in Aug, 12 in Sep, 11 in Oct and Nov. Need by the app's monthly factor fell about 70% from July to November. Run spacing is the app's earlier entry (back 4 days, front 5) and has not been confirmed in Rachio.
+Rachio does shift the planters, but only slightly. Back Planters: 12 min in Jun and Jul, 10 min from Aug. Front Planters: 16 in Jun and Jul, 13 in Aug, 12 in Sep, 11 in Oct and Nov. Need by the app's monthly factor fell about 70% from July to November. Run spacing read from the Rachio schedule page on 2026-11-04: Front Planters every 5 days, Back Planters every 3 days (assumed the same in earlier months). On the same date Front Lawn and Back Lawn both show every 5 days.
 
 | Month | Back planters, share of need | Front planters, share of need |
 |---|---|---|
-| Jun | 81% | 126% |
-| Aug | 77% | 116% |
-| Oct | 138% | 176% |
-| Nov | 225% | 288% |
+| Jun | 108% | 126% |
+| Aug | 102% | 116% |
+| Oct | 183% | 176% |
+| Nov | 299% | 288% |
 
-The front planter was over need all year and well over by October, which matches the wet soil Govind found in early November. The app now recommends turning the front planter off from November to February and probing before restarting, and stopping the front tree bags until April.
+Both planters ran at or above need from June and far above it by October, which matches the wet soil Govind found in the front in early November. The back planter on a 3-day spacing is the larger surprise, though the weak bubbler pressure may mean less water arrives than Moen Flo measures. The app now recommends turning the front planter off from November to February and probing before restarting, and stopping the front tree bags until April.
