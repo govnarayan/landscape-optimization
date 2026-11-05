@@ -330,7 +330,16 @@ const SEASON_PRESETS = {
 // Catch can: 4 containers, 13cm × 13cm opening (= 169 cm² = 26.19 sq inches), 7-min cycle
 // Conversion: fl oz × 1.8047 = cubic inches; depth (in) = cubic inches / 26.19
 const LAWN_CONTAINER_AREA_SQIN = 26.19;
-const LAWN_TARGET_INCHES_PER_WEEK = 0.75; // June effective need at 3" mowing, ~Kc 0.75
+// Peak (June) effective need. Raised from 0.75 after summer 2026: lawn browned at 0.75. Modeled June ET0 was 1.34 in/wk
+// (Open-Meteo archive, Belmont); cool-season fescue/bluegrass at 3" mowing runs about Kc 0.8, so 1.34 x 0.8 = 1.07, rounded to 1.1.
+const LAWN_TARGET_INCHES_PER_WEEK = 1.1;
+const LAWN_MAX_CYCLE_MIN = 6; // longer cycles ran off (visible runoff ~30 min after 7-min cycles)
+
+// What Rachio's Seasonal Shift did to the runtime, relative to the Jun/Jul peak (= 1.00).
+// Read from the monthly "A Seasonal Shift has been made" emails, Jul-Nov 2026. Back Lawn 75 > 64 > 64 > 52 > (you reset to 61) > 31 min;
+// Front Lawn 48 > 40 > 40 > 32 > (reset to 40) > 22 min. The shift is a month-over-month ratio: Aug x0.853, Sep x1.00, Oct x0.8125, Nov x0.51.
+// Keys are month index (0 = Jan). Months not listed have not been observed yet; the app assumes Rachio follows the need curve there.
+const RACHIO_SHIFT_VS_PEAK = { 5: 1.0, 6: 1.0, 7: 0.853, 8: 0.853, 9: 0.693, 10: 0.353 };
 
 const LAWN_DATA = {
   system: {
@@ -341,7 +350,7 @@ const LAWN_DATA = {
     pressureUnderLoad: 42,
     cycleTimeFinding: '6 min (was 7 — visible runoff)',
     soakTime: '30+ min OK',
-    seasonNeed: '0.75 in/wk effective (June, Belmont coastal)',
+    seasonNeed: '1.1 in/wk effective at the June peak, scaled by the monthly factor',
     rainContext: 'Wet season normal (Oct 2025–May 2026: ~19.7 in at SFO, 101% of normal). May 2026 was dry; lawn now on irrigation only.',
   },
   zones: [
@@ -351,12 +360,23 @@ const LAWN_DATA = {
       area: 1000,
       readings: [1.7, 1.9, 2.3, 3.3],     // fl oz per 7-min cycle, catch can
       moenFloGross7min: 170,               // gallons consumed per 7-min cycle (Moen Flo)
-      currentSchedule: { cycles: 2, mins: 7, intervalDays: 5 },
-      recommendedSchedule: { cycles: 3, mins: 6, intervalDays: 5 },
+      designBasis: 'avg',                  // size the run for the average can; hand-water the driest spots
+      siteFactor: 1.0,
+      maxRunMin: null,
+      // Rachio runtime per zone per run (min) and spacing, from the monthly Seasonal Shift emails. Back Lawn = 3 zones.
+      ran2026: [
+        { m: 5, label: 'Jun', mins: 25, days: 5 },
+        { m: 6, label: 'Jul', mins: 25, days: 5 },
+        { m: 7, label: 'Aug', mins: 21, days: 5 },
+        { m: 8, label: 'Sep', mins: 21, days: 4 },
+        { m: 9, label: 'Oct', mins: 17, days: 4 },
+        { m: 10, label: 'Nov', mins: 10, days: 4 },
+      ],
+      currentSchedule: { mins: 10, intervalDays: 4 },
       notes: [
-        'Visible runoff begins ~30 min after 7-min cycles. Water exits via French drains + sump pump to road.',
-        'DU acceptable (~74%); volume + cycle time are the issues, not uniformity.',
-        '3 × 6-min eliminates runoff at roughly same total water as 2 × 7-min.',
+        'Visible runoff begins ~30 min after 7-min cycles. Water exits via French drains + sump pump to road. Keep cycles at 6 min or less and let Rachio soak between them.',
+        'Summer 2026: ran 25 min per zone every 5 days in Jun-Jul and 21 in Aug, which reached an average spot at about 70% of need and the driest can at about half. Brown patches followed in the low-coverage spots, and hand-watering covered them.',
+        'Sized for the average can, which gives about 28 min per zone every 4 days at peak. Sizing for the driest can (1.7 fl oz) would be 35 min, and that was judged too high. The driest spots get hand-watering.',
       ],
       status: 'fixable',
     },
@@ -366,12 +386,23 @@ const LAWN_DATA = {
       area: 250,
       readings: [2.8, 3.7, 4.2, 5.6],
       moenFloGross7min: 63,
-      currentSchedule: { cycles: 2, mins: 7, intervalDays: 5 },
-      recommendedSchedule: { cycles: 3, mins: 6, intervalDays: 5 },
+      designBasis: 'min',
+      siteFactor: 1.25, // calibrated to 2026, not measured: worst browning of the three even with heavy hand-watering
+      maxRunMin: null,
+      ran2026: [
+        { m: 5, label: 'Jun', mins: 24, days: 5 },
+        { m: 6, label: 'Jul', mins: 24, days: 5 },
+        { m: 7, label: 'Aug', mins: 20, days: 5 },
+        { m: 8, label: 'Sep', mins: 20, days: 4 },
+        { m: 9, label: 'Oct', mins: 16, days: 4 },
+        { m: 10, label: 'Nov', mins: 11, days: 4 },
+      ],
+      currentSchedule: { mins: 11, intervalDays: 4 },
       notes: [
-        'Soil probe-tested: dries by day 5 at 6-12" depth. 5-day interval confirmed correct.',
-        'Yellow patches correspond to low-coverage cans (DU 69% — borderline).',
-        'Adding a 3rd cycle at 6 min brings dry spots up; some over-watering at lush spots is the cost of DU compensation.',
+        'Worst zone in Aug-Sep 2026: a dead ring and browning in 5 places, even with heavy hand-watering. Its average catch-can reading is the highest of the three, so the cans alone do not explain it.',
+        'Cans here range 2.8 to 5.6 fl oz (DU 69%). The ring probably sits in a spot none of the 4 cans sampled, or this zone loses more water to sun and heat than the others.',
+        'The 1.25 site factor is a placeholder fitted to this failure, not a measurement. Check it next summer, and re-test with 8 cans placed around the dead ring.',
+        'Soil probe in June 2026: dries by day 5 at 6-12" depth. Five days was the edge, so the schedule now runs every 4 days at peak.',
       ],
       status: 'fixable',
     },
@@ -381,17 +412,59 @@ const LAWN_DATA = {
       area: 250,
       readings: [0.6, 1.0, 1.4, 2.3],
       moenFloGross7min: 63,
-      currentSchedule: { cycles: 2, mins: 7, intervalDays: 5 },
-      recommendedSchedule: { cycles: 2, mins: 6, intervalDays: 5 },
+      designBasis: 'lowHalf',   // lowest 2 cans: the single lowest can (0.6) is a curb-rebound outlier
+      siteFactor: 1.0,
+      maxRunMin: 30,
+      ran2026: [
+        { m: 5, label: 'Jun', mins: 24, days: 5 },
+        { m: 6, label: 'Jul', mins: 24, days: 5 },
+        { m: 7, label: 'Aug', mins: 20, days: 5 },
+        { m: 8, label: 'Sep', mins: 20, days: 4 },
+        { m: 9, label: 'Oct', mins: 16, days: 4 },
+        { m: 10, label: 'Nov', mins: 11, days: 4 },
+      ],
+      currentSchedule: { mins: 11, intervalDays: 4 },
       notes: [
-        '22% catch-can efficiency BUT lawn is growing fine. Indirect water reaches grass via curbing rebound, slope distribution, and clay storage — none captured by upright cans.',
-        'DU poor (~45%) but unfixable: layout is irregular + min head spacing prevents adding heads.',
-        "Don't chase the math; trust the lawn. Keep close to current.",
+        'Catches about a third of the water per minute that the middle zone does (DU 45%). It browned in 2026 at the original 2 x 6, and again at 3 x 6.',
+        'The old note here said to trust the lawn and keep close to current. That was wrong: the lawn did not hold up.',
+        'The math wants 60-80 min per run at peak, which would run off. The schedule caps at 30 min, so a Rachio overlay cannot close this gap. It needs hand-watering, or a nozzle and head fix.',
+        'Cans may under-read here (curb rebound, slope), so treat the 30-min cap as a floor and watch the lawn.',
       ],
       status: 'structural-limit',
     },
   ],
 };
+
+// Spacing between runs, by how much water the month needs. Rachio only scales minutes; the spacing is changed by hand.
+function lawnIntervalDays(needInPerWk) {
+  if (needInPerWk >= 0.8) return 4;
+  if (needInPerWk >= 0.5) return 5;
+  if (needInPerWk >= 0.3) return 7;
+  return 10;
+}
+
+// Inches per minute used to size the run. 'avg' = average can; 'min' = driest can; 'lowHalf' = average of the 2 driest cans.
+function lawnDesignRate(zone) {
+  const perMin = zone.readings.map(oz => (oz * 1.8047) / LAWN_CONTAINER_AREA_SQIN / 7);
+  const sorted = [...perMin].sort((a, b) => a - b);
+  if (zone.designBasis === 'avg') return perMin.reduce((x, y) => x + y, 0) / perMin.length;
+  return zone.designBasis === 'lowHalf' ? (sorted[0] + sorted[1]) / 2 : sorted[0];
+}
+
+function computeLawnMonthly(zone) {
+  const rate = lawnDesignRate(zone);
+  return Object.keys(ETO_FACTOR_BY_MONTH).map(k => {
+    const m = Number(k);
+    const needWk = LAWN_TARGET_INCHES_PER_WEEK * ETO_FACTOR_BY_MONTH[m] * zone.siteFactor;
+    const days = lawnIntervalDays(LAWN_TARGET_INCHES_PER_WEEK * ETO_FACTOR_BY_MONTH[m]);
+    const rawMin = (needWk * days / 7) / rate;
+    const capped = zone.maxRunMin ? rawMin > zone.maxRunMin : false;
+    const runMin = capped ? zone.maxRunMin : rawMin;
+    const cycles = Math.max(1, Math.ceil(runMin / LAWN_MAX_CYCLE_MIN));
+    const per = Math.round(runMin / cycles);
+    return { m, needWk, days, rawMin, capped, cycles, per, total: cycles * per };
+  });
+}
 
 function computeLawnZone(zone) {
   const depths7 = zone.readings.map(oz => (oz * 1.8047) / LAWN_CONTAINER_AREA_SQIN);
@@ -403,38 +476,37 @@ function computeLawnZone(zone) {
   // Effective gallons delivered to lawn surface per 7-min cycle
   const avgGalAt7 = avgDepth7 * zone.area * 0.623;
   const efficiency = (avgGalAt7 / zone.moenFloGross7min) * 100;
-  // At 6-min cycles
-  const avgDepth6 = avgDepth7 * 6 / 7;
-  const maxDepth6 = maxDepth7 * 6 / 7;
-  const avgGalAt6 = avgGalAt7 * 6 / 7;
-  const moenFlo6 = zone.moenFloGross7min * 6 / 7;
-  // Current weekly delivery (uses 7-min readings since current is 7-min cycles)
+  const monthly = computeLawnMonthly(zone);
+  const rate = lawnDesignRate(zone);
+  const avgRate = avgDepth7 / 7;
+  // Current weekly delivery (Rachio's November runtime)
   const cs = zone.currentSchedule;
-  const currentDepthPerSession = avgDepth7 * cs.cycles;
-  const currentSessionsPerWeek = 7 / cs.intervalDays;
-  const currentWeeklyAvg = currentDepthPerSession * currentSessionsPerWeek;
+  const currentWeeklyAvg = avgRate * cs.mins * (7 / cs.intervalDays);
   const currentWeeklyAvgGal = currentWeeklyAvg * zone.area * 0.623;
-  // Recommended weekly delivery (uses 6-min depths if 6-min scheduled, 7-min if 7-min)
-  const rs = zone.recommendedSchedule;
-  const recDepthPerCycle = rs.mins === 6 ? avgDepth6 : avgDepth7;
-  const recMaxDepthPerCycle = rs.mins === 6 ? maxDepth6 : maxDepth7;
-  const recSessionsPerWeek = 7 / rs.intervalDays;
-  const recWeeklyAvg = recDepthPerCycle * rs.cycles * recSessionsPerWeek;
-  const recWeeklyMax = recMaxDepthPerCycle * rs.cycles * recSessionsPerWeek;
+  // Peak (June) recommended schedule
+  const peak = monthly.find(r => r.m === 5);
+  const recommendedSchedule = { cycles: peak.cycles, mins: peak.per, total: peak.total, intervalDays: peak.days };
+  const recWeeklyAvg = avgRate * peak.total * (7 / peak.days);
+  const recWeeklyMin = rate * peak.total * (7 / peak.days);
   const recWeeklyAvgGal = recWeeklyAvg * zone.area * 0.623;
+  // What the 2026 runs delivered at the sizing spot, against that month's need
+  const reality = zone.ran2026.map(r => {
+    const delivered = rate * r.mins * (7 / r.days);
+    const need = LAWN_TARGET_INCHES_PER_WEEK * ETO_FACTOR_BY_MONTH[r.m] * zone.siteFactor;
+    return { ...r, delivered, need, pct: (delivered / need) * 100 };
+  });
   return {
     ...zone,
+    recommendedSchedule,
     depths7,
     avgDepth7, maxDepth7, minDepth7,
-    avgDepth6, maxDepth6,
-    avgGalAt7, avgGalAt6,
-    moenFlo6,
+    avgGalAt7,
     efficiency, du,
+    monthly, reality, peak,
     currentWeeklyAvg, currentWeeklyAvgGal,
-    recWeeklyAvg, recWeeklyMax, recWeeklyAvgGal,
+    recWeeklyAvg, recWeeklyMin, recWeeklyAvgGal,
     target: LAWN_TARGET_INCHES_PER_WEEK,
-    avgVsTarget: (recWeeklyAvg / LAWN_TARGET_INCHES_PER_WEEK) * 100,
-    maxVsTarget: (recWeeklyMax / LAWN_TARGET_INCHES_PER_WEEK) * 100,
+    minVsTarget: (recWeeklyMin / (LAWN_TARGET_INCHES_PER_WEEK * zone.siteFactor)) * 100,
   };
 }
 
@@ -443,6 +515,7 @@ function computeLawnZone(zone) {
 // (deep percolation in fast-draining soil, lateral spread, surface evap).
 // CRITICAL: only key the recommended TOTAL MINUTES + INTERVAL into Rachio.
 // Effective need (gal/wk) is for analysis only — do NOT enter it as Rachio input.
+// effectiveNeed is the June peak; every other month scales by ETO_FACTOR_BY_MONTH.
 const PLANTER_DATA = {
   zones: [
     {
@@ -453,17 +526,27 @@ const PLANTER_DATA = {
       mulch: 'Shredded mulch · 4" bare around stems',
       grossPerCycle: 28,             // Moen Flo: gal per 4-min cycle
       cycleMins: 4,
-      currentRachioInput: { totalMins: 27, intervalDays: 4 },
-      recommendedRachio: { totalMins: 16, intervalDays: 3, cycles: 4, cycleMins: 4 },
-      effectiveNeed: 100,            // gal/wk (calc'd from plant species needs)
+      effectiveNeed: 100,            // gal/wk at the June peak (calc'd from plant species needs)
       efficiency: 55,                // %, midpoint of 45-65% range
       efficiencyRange: '45-65%',
+      offBelow: 0.25,                // month factor under which the bed runs on rain, probe first
+      // Spacing by month factor: [factor at or above, days]
+      spacing: [[0.8, 3], [0.5, 4], [0.3, 5], [0, 7]],
+      // Rachio runtime per run (min), from the monthly Seasonal Shift emails. Spacing is the app's earlier entry; verify in Rachio.
+      ran2026: [
+        { m: 5, label: 'Jun', mins: 12, days: 4 },
+        { m: 6, label: 'Jul', mins: 12, days: 4 },
+        { m: 7, label: 'Aug', mins: 10, days: 4 },
+        { m: 8, label: 'Sep', mins: 10, days: 4 },
+        { m: 9, label: 'Oct', mins: 10, days: 4 },
+        { m: 10, label: 'Nov', mins: 10, days: 4 },
+      ],
       notes: [
         'Fast-draining soil: 25-40% loss to deep percolation past root zone is the main inefficiency.',
         'Shredded mulch (in place) reduces surface evap to ~3-5%.',
         'Bubblers correctly placed (e.g., Gardenia: 2 at MED, diametrically opposite, 6" from stem).',
-        'Shorter cycles + more frequent intervals keep root zone consistently moist vs current cycle of wet → dust over 4 days.',
-        'After switching, probe-test root zone (4-8" deep) 2 days after watering: should feel moist, not bone-dry.',
+        'The bubblers deliver little water at the moment because of low pressure, so the Moen Flo number may overstate what reaches the plants. Soil here has not been checked since the cut to 10 min.',
+        'Sweet pea shrubs at the back yellowed completely in 2026 while the bubbler flow looked fine; mulch was pulled back from the stems. Watching.',
       ],
     },
     {
@@ -474,60 +557,66 @@ const PLANTER_DATA = {
       mulch: 'Wood bark chips · 4" bare around stems',
       grossPerCycle: 23,             // Moen Flo: gal per 4-min cycle
       cycleMins: 4,
-      currentRachioInput: { totalMins: 27, intervalDays: 5 },
-      recommendedRachio: { totalMins: 16, intervalDays: 5, cycles: 4, cycleMins: 4 },
       effectiveNeed: 80,
       efficiency: 78,                // %, midpoint of 70-85% range
       efficiencyRange: '70-85%',
+      offBelow: 0.35,                // clay holds water: off Nov through Feb unless the probe is dry
+      spacing: [[0.5, 5], [0.3, 7], [0, 10]],
+      ran2026: [
+        { m: 5, label: 'Jun', mins: 16, days: 5 },
+        { m: 6, label: 'Jul', mins: 16, days: 5 },
+        { m: 7, label: 'Aug', mins: 13, days: 5 },
+        { m: 8, label: 'Sep', mins: 12, days: 5 },
+        { m: 9, label: 'Oct', mins: 11, days: 5 },
+        { m: 10, label: 'Nov', mins: 11, days: 5 },
+      ],
       notes: [
         'Clay holds water well: minimal deep percolation; main loss is lateral concentration around point-source bubblers (8-15%).',
         'Wood bark chips reduce surface evap to ~3-5%.',
-        '5-day interval works because clay releases water slowly to roots over multi-day periods.',
-        "Don't shorten interval — clay's storage capacity is the buffer.",
+        'Soil was wet when dug up in early Nov 2026, with Rachio still running 11 min. The runtime had fallen only from 16 to 11 while need fell about 70%.',
+        "Don't shorten interval: clay's storage capacity is the buffer. Shut off Nov to Feb and probe before turning back on.",
       ],
     },
   ],
 };
 
+// Planter Seasonal Shift as seen in the emails, relative to the Jun/Jul runtime (= 1.00). Keys are month index.
+// Back: 12 min in Jun-Jul, 10 from Aug. Front: 16 in Jun-Jul, 13 Aug, 12 Sep, 11 Oct-Nov.
+const PLANTER_SHIFT_VS_PEAK = {
+  'backyard-planter': { 5: 1, 6: 1, 7: 0.833, 8: 0.833, 9: 0.833, 10: 0.833 },
+  'frontyard-planter': { 5: 1, 6: 1, 7: 0.8125, 8: 0.75, 9: 0.6875, 10: 0.6875 },
+};
+
+function planterSpacingDays(zone, factor) {
+  for (const [atLeast, days] of zone.spacing) if (factor >= atLeast) return days;
+  return zone.spacing[zone.spacing.length - 1][1];
+}
+
+function computePlanterMonthly(zone) {
+  const gpm = zone.grossPerCycle / zone.cycleMins;
+  return Object.keys(ETO_FACTOR_BY_MONTH).map(k => {
+    const m = Number(k);
+    const f = ETO_FACTOR_BY_MONTH[m];
+    const needEff = zone.effectiveNeed * f;
+    const days = planterSpacingDays(zone, f);
+    const off = f < zone.offBelow;
+    const grossWk = needEff / (zone.efficiency / 100);
+    const mins = Math.max(3, Math.round((grossWk / gpm) * (days / 7)));
+    return { m, f, needEff, days, off, mins, grossWk };
+  });
+}
+
 function computePlanterZone(zone) {
-  const cur = zone.currentRachioInput;
-  const rec = zone.recommendedRachio;
-
-  // Current: total min / cycleMins = cycles per session
-  const currentCyclesPerSession = cur.totalMins / zone.cycleMins;
-  const currentGrossPerSession = currentCyclesPerSession * zone.grossPerCycle;
-  const currentGrossPerWeek = currentGrossPerSession * (7 / cur.intervalDays);
-  const currentEffectivePerWeek = currentGrossPerWeek * (zone.efficiency / 100);
-
-  // Recommended
-  const recGrossPerSession = rec.cycles * zone.grossPerCycle;
-  const recGrossPerWeek = recGrossPerSession * (7 / rec.intervalDays);
-  const recEffectivePerWeek = recGrossPerWeek * (zone.efficiency / 100);
-
-  // Effective need range (low/high efficiency bounds)
-  const effLow = parseInt(zone.efficiencyRange.split('-')[0]) / 100;
-  const effHigh = parseInt(zone.efficiencyRange.split('-')[1]) / 100;
-  const recEffLow = recGrossPerWeek * effLow;
-  const recEffHigh = recGrossPerWeek * effHigh;
-
-  return {
-    ...zone,
-    currentCyclesPerSession,
-    currentGrossPerSession,
-    currentGrossPerWeek,
-    currentEffectivePerWeek,
-    currentVsNeed: (currentEffectivePerWeek / zone.effectiveNeed) * 100,
-    recGrossPerSession,
-    recGrossPerWeek,
-    recEffectivePerWeek,
-    recEffLow,
-    recEffHigh,
-    recVsNeed: (recEffectivePerWeek / zone.effectiveNeed) * 100,
-    recVsNeedLow: (recEffLow / zone.effectiveNeed) * 100,
-    recVsNeedHigh: (recEffHigh / zone.effectiveNeed) * 100,
-    waterSavedGalPerWeek: currentGrossPerWeek - recGrossPerWeek,
-    waterSavedPercent: ((currentGrossPerWeek - recGrossPerWeek) / currentGrossPerWeek) * 100,
-  };
+  const gpm = zone.grossPerCycle / zone.cycleMins;
+  const monthly = computePlanterMonthly(zone);
+  const peak = monthly.find(r => r.m === 5);
+  const reality = zone.ran2026.map(r => {
+    const effWk = r.mins * gpm * (7 / r.days) * (zone.efficiency / 100);
+    const need = zone.effectiveNeed * ETO_FACTOR_BY_MONTH[r.m];
+    return { ...r, effWk, need, pct: (effWk / need) * 100 };
+  });
+  const cur = zone.ran2026[zone.ran2026.length - 1];
+  return { ...zone, gpm, monthly, peak, reality, cur };
 }
 
 // Veggie raised beds — single drip zone across all 5 beds
@@ -2675,9 +2764,39 @@ function ScheduleControl({ label, runtime, interval, onChange, plantCount, total
   );
 }
 
+const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
 function LawnWateringSection() {
   const zones = LAWN_DATA.zones.map(computeLawnZone);
   const sys = LAWN_DATA.system;
+  const nowM = new Date().getMonth();
+  // What Rachio shows for this month, per zone per run (min). Typed in from the 1st-of-month Seasonal Shift email.
+  const [rachioNow, setRachioNow] = useState({});
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await window.storage.get('garden:rachioNow');
+        if (r && r.value) {
+          const v = JSON.parse(r.value);
+          if (v && v.month === nowM) setRachioNow(v.values || {});
+        }
+      } catch (e) { /* storage unavailable: the page works without it */ }
+    })();
+  }, []);
+  const setRachioFor = (zoneId, val) => {
+    const next = { ...rachioNow, [zoneId]: val };
+    setRachioNow(next);
+    try { window.storage.set('garden:rachioNow', JSON.stringify({ month: nowM, values: next })); } catch (e) { /* ignore */ }
+  };
+  // Rachio's runtime for a zone in month m: peak key-in x the shift seen in 2026. Unseen months assume Rachio tracks the need curve.
+  const rachioExpected = (z, row) => {
+    if (row.m === nowM && rachioNow[z.id] !== undefined && rachioNow[z.id] !== '' && !isNaN(Number(rachioNow[z.id]))) {
+      return { mins: Number(rachioNow[z.id]), source: 'typed' };
+    }
+    const ratio = RACHIO_SHIFT_VS_PEAK[row.m];
+    if (ratio !== undefined) return { mins: z.peak.total * ratio, source: 'seen' };
+    return { mins: row.total, source: 'assumed' };
+  };
 
   const statusColor = (vs) => {
     if (vs < 60) return 'bg-rose-100 text-rose-900 border-rose-300';
@@ -2697,7 +2816,152 @@ function LawnWateringSection() {
       <div>
         <div className="display text-xl md:text-2xl mb-2">Lawn watering — measured + planned</div>
         <div className="text-xs md:text-sm text-stone-600 mb-4 max-w-3xl">
-          Based on catch-can test (4 containers, 13cm × 13cm, 7-min cycle) cross-referenced with Moen Flo whole-house consumption data. Each zone has different characteristics and a tailored schedule. Target: <span className="font-semibold num">{LAWN_TARGET_INCHES_PER_WEEK}"/wk</span> effective (June, Belmont coastal — lower than CIMIS reference due to marine layer + 3" mowing).
+          Based on catch-can test (4 containers, 13cm × 13cm, 7-min cycle) cross-referenced with Moen Flo whole-house consumption data. Each zone has different characteristics and a tailored schedule. Peak target: <span className="font-semibold num">{LAWN_TARGET_INCHES_PER_WEEK}"/wk</span> effective in June, scaled down by month. Raised from 0.75 after summer 2026, when the lawn browned. Backyard is sized on the average can, frontyard middle on its driest can, and frontyard side on its two driest.
+        </div>
+      </div>
+
+      {/* Monthly schedule by zone */}
+      <div className="border border-emerald-300 rounded-sm bg-emerald-50/50 p-4 md:p-5">
+        <div className="display text-lg mb-1 text-emerald-900">Monthly schedule: minutes per zone per run, and how often</div>
+        <div className="text-xs text-stone-600 mb-3 max-w-3xl">
+          Cycles are 6 min or less so the clay does not run off. Key the June figure into Rachio as the base and leave Seasonal Shift on. The next table shows where Rachio's own shift falls short and what to add by hand.
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs md:text-sm border-collapse min-w-[560px]">
+            <thead>
+              <tr className="border-b border-emerald-300 text-left">
+                <th className="py-1.5 pr-3">Month</th>
+                <th className="py-1.5 pr-3">Need</th>
+                <th className="py-1.5 pr-3">Every</th>
+                {zones.map(z => <th key={z.id} className="py-1.5 pr-3">{z.label}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {zones[0].monthly.map((row, i) => (
+                <tr key={row.m} className={`border-b border-emerald-200/60 ${row.m === nowM ? 'bg-amber-100/70 font-semibold' : ''}`}>
+                  <td className="py-1.5 pr-3">{SHORT_MONTHS[row.m]}{row.m === nowM ? ' ★' : ''}</td>
+                  <td className="py-1.5 pr-3 num">{(LAWN_TARGET_INCHES_PER_WEEK * ETO_FACTOR_BY_MONTH[row.m]).toFixed(2)}"/wk</td>
+                  <td className="py-1.5 pr-3 num">{row.days} days</td>
+                  {zones.map(z => {
+                    const r = z.monthly[i];
+                    return (
+                      <td key={z.id} className="py-1.5 pr-3 num">
+                        {r.total} min <span className="text-stone-500">({r.cycles} × {r.per})</span>{r.capped ? <span className="text-rose-700"> cap</span> : null}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="text-[11px] text-stone-600 mt-2 max-w-3xl">
+          "cap" means the math wants more than the zone can take without running off. Frontyard side is the one: no Rachio setting closes it, so it needs hand-watering or a nozzle and head fix. Frontyard middle carries a 1.25 site factor fitted to its 2026 failure; it is a placeholder to check next summer.
+        </div>
+      </div>
+
+      {/* Rachio overlay */}
+      <div className="border border-sky-300 rounded-sm bg-sky-50/60 p-4 md:p-5">
+        <div className="display text-lg mb-1 text-sky-900">Rachio overlay: leave Seasonal Shift on, add by hand only where it falls short</div>
+        <div className="text-xs text-stone-700 mb-3 max-w-3xl">
+          With the June figure as the base, Rachio ran these shifts in 2026: August and September about 0.85 of peak, October 0.69, November 0.35. They are read from your monthly emails. Months not seen yet assume Rachio tracks the need curve; type in what Rachio shows on the 1st to check the current month.
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+          {zones.map(z => (
+            <label key={z.id} className="text-xs bg-white border border-sky-200 rounded-sm p-2 block">
+              <div className="font-semibold mb-1">{z.label}: Rachio shows now</div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number" min="0" inputMode="numeric"
+                  value={rachioNow[z.id] === undefined ? '' : rachioNow[z.id]}
+                  onChange={e => setRachioFor(z.id, e.target.value)}
+                  placeholder="min per zone"
+                  className="w-24 border border-stone-300 rounded-sm px-2 py-1 num"
+                />
+                <span className="text-stone-500">min per zone per run</span>
+              </div>
+            </label>
+          ))}
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs md:text-sm border-collapse min-w-[560px]">
+            <thead>
+              <tr className="border-b border-sky-300 text-left">
+                <th className="py-1.5 pr-3">Month</th>
+                {zones.map(z => <th key={z.id} className="py-1.5 pr-3">{z.label}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {zones[0].monthly.map((row, i) => (
+                <tr key={row.m} className={`border-b border-sky-200/60 ${row.m === nowM ? 'bg-amber-100/70' : ''}`}>
+                  <td className="py-1.5 pr-3">{SHORT_MONTHS[row.m]}{row.m === nowM ? ' ★' : ''}</td>
+                  {zones.map(z => {
+                    const r = z.monthly[i];
+                    const ex = rachioExpected(z, r);
+                    const gap = Math.round(r.total - ex.mins);
+                    let verdict;
+                    if (r.capped) verdict = <span className="text-rose-700">hand-water</span>;
+                    else if (gap >= 2) verdict = <span className="text-amber-800 font-semibold">add {gap} min</span>;
+                    else verdict = <span className="text-emerald-700">OK</span>;
+                    return (
+                      <td key={z.id} className="py-1.5 pr-3 num">
+                        <span className="text-stone-600">Rachio {Math.round(ex.mins)}{ex.source === 'assumed' ? '?' : ''}</span> vs need {r.total} {'→'} {verdict}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="text-[11px] text-stone-600 mt-2 max-w-3xl">
+          "?" means that month's Rachio shift has not been seen yet. Each run's minutes assume the spacing in the table above, which you change by hand since Rachio only scales minutes.
+        </div>
+      </div>
+
+      {/* Heat rule + first-of-month check: done in Rachio */}
+      <div className="border border-amber-300 rounded-sm bg-amber-50 p-4 md:p-5">
+        <div className="display text-lg mb-1 text-amber-900">Do these in Rachio, not here</div>
+        <div className="text-xs md:text-sm text-amber-900 space-y-2 max-w-3xl">
+          <p><span className="font-semibold">First of the month:</span> read Rachio's Seasonal Shift email. If the new runtime is below the "need" in the overlay table, edit the runtime in Rachio up to that number. If the 1st falls inside a warm spell, hold the cut until it ends. In 2026, Rachio cut August by about 15% on Aug 1, the first day of a 4-day stretch at 78-82°F.</p>
+          <p><span className="font-semibold">Warm spells:</span> when highs are forecast at 78°F or more for 3 days or more, run an extra session by hand on the lawn zones. In 2026 these stretches raised weekly water loss by 10 to 35% over the month's norm: Jun 10-13, Jul 12-15, Aug 1-4, Sep 7-10 and Sep 29 to Oct 8 (modeled temperatures, not a station).</p>
+        </div>
+      </div>
+
+      {/* 2026 reality check */}
+      <div className="border border-stone-300 rounded-sm bg-white p-4 md:p-5">
+        <div className="display text-lg mb-1">2026 reality check: what you ran vs what the lawn needed</div>
+        <div className="text-xs text-stone-600 mb-3 max-w-3xl">
+          Water delivered at the sizing spot each week, against that month's need. This is from Rachio's emails and does not count any hand-watering. Under 80% is where the browning came from.
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs md:text-sm border-collapse min-w-[520px]">
+            <thead>
+              <tr className="border-b border-stone-300 text-left">
+                <th className="py-1.5 pr-3">Month</th>
+                {zones.map(z => <th key={z.id} className="py-1.5 pr-3">{z.label}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {zones[0].reality.map((row, i) => (
+                <tr key={row.label} className="border-b border-stone-200">
+                  <td className="py-1.5 pr-3">{row.label}</td>
+                  {zones.map(z => {
+                    const r = z.reality[i];
+                    const tone = r.pct < 80 ? 'text-rose-700' : r.pct < 100 ? 'text-amber-700' : 'text-emerald-700';
+                    return (
+                      <td key={z.id} className="py-1.5 pr-3 num">
+                        {r.mins} min / {r.days}d <span className={`font-semibold ${tone}`}>{r.pct.toFixed(0)}%</span>
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="text-[11px] text-stone-600 mt-2 max-w-3xl">
+          Rachio cut August by about 15% (75 to 64 min total for the back, 48 to 40 for the front) while the lawn was already behind from July. Sizing uses the average can for the backyard, the driest can for frontyard middle, and the two driest for the side.
         </div>
       </div>
 
@@ -2745,7 +3009,6 @@ function LawnWateringSection() {
         {zones.map(z => {
           const cs = z.currentSchedule;
           const rs = z.recommendedSchedule;
-          const sameSchedule = cs.cycles === rs.cycles && cs.mins === rs.mins && cs.intervalDays === rs.intervalDays;
           return (
             <div key={z.id} className="border border-stone-300 rounded-sm overflow-hidden bg-white">
               <div className="bg-stone-100 px-4 py-3 border-b border-stone-300 flex items-center justify-between gap-3 flex-wrap">
@@ -2753,12 +3016,8 @@ function LawnWateringSection() {
                   <div className="display text-lg">{z.label}</div>
                   <div className="text-xs text-stone-600 num">{z.area} sq ft</div>
                 </div>
-                <div className={`text-[10px] uppercase tracking-wider px-2 py-1 rounded-sm border ${statusColor(z.avgVsTarget)}`}>
-                  {z.status === 'structural-limit' ? 'Structural limit · trust the lawn' :
-                   z.avgVsTarget < 60 ? `${z.avgVsTarget.toFixed(0)}% of target avg` :
-                   z.avgVsTarget < 90 ? `${z.avgVsTarget.toFixed(0)}% avg (under)` :
-                   z.avgVsTarget < 130 ? `${z.avgVsTarget.toFixed(0)}% avg (in range)` :
-                   `${z.avgVsTarget.toFixed(0)}% avg (over)`}
+                <div className={`text-[10px] uppercase tracking-wider px-2 py-1 rounded-sm border ${statusColor(z.peak.capped ? 0 : 100)}`}>
+                  {z.peak.capped ? 'Capped · needs hand-watering or a head fix' : `Peak ${z.peak.total} min every ${z.peak.days}d`}
                 </div>
               </div>
 
@@ -2810,16 +3069,16 @@ function LawnWateringSection() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-3 border-t border-stone-200">
                   <div className="bg-stone-50 border border-stone-200 rounded-sm p-3">
                     <div className="text-[10px] uppercase tracking-wider text-stone-500 mb-1">Current schedule</div>
-                    <div className="num font-semibold">{cs.cycles} × {cs.mins} min / every {cs.intervalDays}d</div>
+                    <div className="num font-semibold">{cs.mins} min per run / every {cs.intervalDays}d</div>
                     <div className="text-[11px] text-stone-600 mt-1">
-                      Avg weekly: <span className="num font-semibold">{z.currentWeeklyAvg.toFixed(2)}"</span> (<span className="num">{z.currentWeeklyAvgGal.toFixed(0)} gal</span>)
+                      November (Rachio shifted). Avg weekly: <span className="num font-semibold">{z.currentWeeklyAvg.toFixed(2)}"</span> (<span className="num">{z.currentWeeklyAvgGal.toFixed(0)} gal</span>)
                     </div>
                   </div>
-                  <div className={`border rounded-sm p-3 ${sameSchedule ? 'bg-stone-50 border-stone-200' : 'bg-emerald-50 border-emerald-300'}`}>
-                    <div className="text-[10px] uppercase tracking-wider mb-1 font-semibold text-emerald-900">{sameSchedule ? 'No change recommended' : 'Recommended'}</div>
-                    <div className="num font-semibold">{rs.cycles} × {rs.mins} min / every {rs.intervalDays}d</div>
+                  <div className="border rounded-sm p-3 bg-emerald-50 border-emerald-300">
+                    <div className="text-[10px] uppercase tracking-wider mb-1 font-semibold text-emerald-900">June peak: key into Rachio as the base</div>
+                    <div className="num font-semibold">{rs.total} min per run ({rs.cycles} × {rs.mins}) / every {rs.intervalDays}d</div>
                     <div className="text-[11px] text-stone-700 mt-1">
-                      Avg: <span className="num font-semibold">{z.recWeeklyAvg.toFixed(2)}"</span> ({z.avgVsTarget.toFixed(0)}% of target) · Max-spot: <span className="num font-semibold">{z.recWeeklyMax.toFixed(2)}"</span> ({z.maxVsTarget.toFixed(0)}%)
+                      Avg: <span className="num font-semibold">{z.recWeeklyAvg.toFixed(2)}"</span> · Driest spot: <span className="num font-semibold">{z.recWeeklyMin.toFixed(2)}"</span> ({z.minVsTarget.toFixed(0)}% of its need)
                     </div>
                     <div className="text-[10px] text-stone-600 mt-1 num">{z.recWeeklyAvgGal.toFixed(0)} gal/wk gross to lawn</div>
                   </div>
@@ -2885,7 +3144,7 @@ function LawnWateringSection() {
             </tbody>
           </table>
           <div className="mt-3 pt-3 border-t border-amber-200 text-xs">
-            <span className="font-semibold">Seasonal escalation:</span> ETo peaks ~July-Aug at ~110% of June. Plan to add 1 cycle to backyard + frontyard middle in late July if needed. ETo drops 30-40% by Sept — drop 1 cycle. Mostly off Nov-Feb as rains return.
+            <span className="font-semibold">Seasonal curve:</span> demand peaks in June at 1.1"/wk and falls to about 70% by September and 30% by November. The monthly table already follows that. Do not wait for browning in July or August: in 2026 the damage built up before it showed.
           </div>
         </div>
       </div>
@@ -2895,108 +3154,208 @@ function LawnWateringSection() {
 
 function PlanterWateringSection() {
   const zones = PLANTER_DATA.zones.map(computePlanterZone);
-  const totalSaved = zones.reduce((s, z) => s + z.waterSavedGalPerWeek, 0);
+  const nowM = new Date().getMonth();
+  const [rachioNow, setRachioNow] = useState({});
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await window.storage.get('garden:rachioNowPlanters');
+        if (r && r.value) {
+          const v = JSON.parse(r.value);
+          if (v && v.month === nowM) setRachioNow(v.values || {});
+        }
+      } catch (e) { /* storage unavailable: the page works without it */ }
+    })();
+  }, []);
+  const setRachioFor = (zoneId, val) => {
+    const next = { ...rachioNow, [zoneId]: val };
+    setRachioNow(next);
+    try { window.storage.set('garden:rachioNowPlanters', JSON.stringify({ month: nowM, values: next })); } catch (e) { /* ignore */ }
+  };
+  const rachioExpected = (z, row) => {
+    const typed = rachioNow[z.id];
+    if (row.m === nowM && typed !== undefined && typed !== '' && !isNaN(Number(typed))) return { mins: Number(typed), source: 'typed' };
+    const ratio = PLANTER_SHIFT_VS_PEAK[z.id][row.m];
+    if (ratio !== undefined) return { mins: z.peak.mins * ratio, source: 'seen' };
+    return { mins: row.off ? 0 : row.mins, source: 'assumed' };
+  };
 
   return (
     <div className="space-y-5">
       <div>
         <div className="display text-xl md:text-2xl mb-2">Planter watering — measured + planned</div>
         <div className="text-xs md:text-sm text-stone-600 mb-2 max-w-3xl">
-          Based on Moen Flo whole-zone consumption + species-derived water needs + soil-specific loss estimates. Each zone has different efficiency due to soil drainage characteristics.
+          Based on Moen Flo whole-zone consumption + species-derived water needs + soil-specific loss estimates. Need is set at the June peak and scaled down by month, so the schedule falls in the fall instead of staying at the summer setting.
         </div>
         <div className="bg-amber-50 border-l-4 border-amber-400 rounded-sm p-3 text-xs md:text-sm text-amber-900 max-w-3xl">
-          <span className="font-semibold">Rachio entry rule:</span> only key the <span className="font-semibold">total minutes per session</span> + <span className="font-semibold">interval days</span> into Rachio. Effective need (gal/wk) is for analysis — do NOT enter it. Rachio doesn't accept gallons and entering 80/100 directly would massively under-water.
+          <span className="font-semibold">Rachio entry rule:</span> only key the <span className="font-semibold">minutes per run</span> + <span className="font-semibold">interval days</span> into Rachio. Effective need (gal/wk) is for analysis — do NOT enter it.
+        </div>
+      </div>
+
+      {/* Monthly schedule */}
+      <div className="border border-emerald-300 rounded-sm bg-emerald-50/50 p-4 md:p-5">
+        <div className="display text-lg mb-1 text-emerald-900">Monthly schedule: minutes per run, and how often</div>
+        <div className="text-xs text-stone-600 mb-3 max-w-3xl">Key the June figure into Rachio as the base and leave Seasonal Shift on. "Off" means the bed runs on rain and a dry probe at 4-8" turns it back on.</div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs md:text-sm border-collapse min-w-[460px]">
+            <thead>
+              <tr className="border-b border-emerald-300 text-left">
+                <th className="py-1.5 pr-3">Month</th>
+                {zones.map(z => <th key={z.id} className="py-1.5 pr-3">{z.label}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {zones[0].monthly.map((row, i) => (
+                <tr key={row.m} className={`border-b border-emerald-200/60 ${row.m === nowM ? 'bg-amber-100/70 font-semibold' : ''}`}>
+                  <td className="py-1.5 pr-3">{SHORT_MONTHS[row.m]}{row.m === nowM ? ' ★' : ''}</td>
+                  {zones.map(z => {
+                    const r = z.monthly[i];
+                    return <td key={z.id} className="py-1.5 pr-3 num">{r.off ? <span className="text-stone-500">Off, probe first</span> : <>{r.mins} min / every {r.days}d</>}</td>;
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Rachio overlay */}
+      <div className="border border-sky-300 rounded-sm bg-sky-50/60 p-4 md:p-5">
+        <div className="display text-lg mb-1 text-sky-900">Rachio overlay: where its shift runs too high or too low</div>
+        <div className="text-xs text-stone-700 mb-3 max-w-3xl">
+          Rachio does shift the planters, but only a little: back from 12 to 10 min, front from 16 to 11, while the need fell about 70%. Type in what Rachio shows on the 1st to check the current month. A "?" means that month has not been seen yet.
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+          {zones.map(z => (
+            <label key={z.id} className="text-xs bg-white border border-sky-200 rounded-sm p-2 block">
+              <div className="font-semibold mb-1">{z.label}: Rachio shows now</div>
+              <div className="flex items-center gap-2">
+                <input type="number" min="0" inputMode="numeric"
+                  value={rachioNow[z.id] === undefined ? '' : rachioNow[z.id]}
+                  onChange={e => setRachioFor(z.id, e.target.value)}
+                  placeholder="min per run"
+                  className="w-24 border border-stone-300 rounded-sm px-2 py-1 num" />
+                <span className="text-stone-500">min per run</span>
+              </div>
+            </label>
+          ))}
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs md:text-sm border-collapse min-w-[460px]">
+            <thead>
+              <tr className="border-b border-sky-300 text-left">
+                <th className="py-1.5 pr-3">Month</th>
+                {zones.map(z => <th key={z.id} className="py-1.5 pr-3">{z.label}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {zones[0].monthly.map((row, i) => (
+                <tr key={row.m} className={`border-b border-sky-200/60 ${row.m === nowM ? 'bg-amber-100/70' : ''}`}>
+                  <td className="py-1.5 pr-3">{SHORT_MONTHS[row.m]}{row.m === nowM ? ' ★' : ''}</td>
+                  {zones.map(z => {
+                    const r = z.monthly[i];
+                    const ex = rachioExpected(z, r);
+                    const target = r.off ? 0 : r.mins;
+                    const gap = Math.round(target - ex.mins);
+                    let verdict;
+                    if (r.off && ex.mins >= 1) verdict = <span className="text-rose-700 font-semibold">turn off</span>;
+                    else if (gap <= -2) verdict = <span className="text-rose-700 font-semibold">cut {-gap} min</span>;
+                    else if (gap >= 2) verdict = <span className="text-amber-800 font-semibold">add {gap} min</span>;
+                    else verdict = <span className="text-emerald-700">OK</span>;
+                    return (
+                      <td key={z.id} className="py-1.5 pr-3 num">
+                        <span className="text-stone-600">Rachio {Math.round(ex.mins)}{ex.source === 'assumed' ? '?' : ''}</span> vs need {r.off ? 0 : r.mins} {'→'} {verdict}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* 2026 reality check */}
+      <div className="border border-stone-300 rounded-sm bg-white p-4 md:p-5">
+        <div className="display text-lg mb-1">2026 reality check: what you ran vs what the beds needed</div>
+        <div className="text-xs text-stone-600 mb-3 max-w-3xl">Effective water delivered each week against that month's need. Spacing is the app's earlier entry (back 4 days, front 5), so confirm it in Rachio. Over 130% is overwatering.</div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs md:text-sm border-collapse min-w-[460px]">
+            <thead>
+              <tr className="border-b border-stone-300 text-left">
+                <th className="py-1.5 pr-3">Month</th>
+                {zones.map(z => <th key={z.id} className="py-1.5 pr-3">{z.label}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {zones[0].reality.map((row, i) => (
+                <tr key={row.label} className="border-b border-stone-200">
+                  <td className="py-1.5 pr-3">{row.label}</td>
+                  {zones.map(z => {
+                    const r = z.reality[i];
+                    const tone = r.pct > 130 ? 'text-rose-700' : r.pct >= 80 ? 'text-emerald-700' : 'text-amber-700';
+                    return <td key={z.id} className="py-1.5 pr-3 num">{r.mins} min / {r.days}d <span className={`font-semibold ${tone}`}>{r.pct.toFixed(0)}%</span></td>;
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
 
       {/* Per-zone cards */}
-      {zones.map(z => {
-        const cur = z.currentRachioInput;
-        const rec = z.recommendedRachio;
-        const overwatering = z.currentVsNeed > 130;
-        return (
-          <div key={z.id} className="border border-stone-300 rounded-sm overflow-hidden bg-white">
-            <div className="bg-stone-100 px-4 py-3 border-b border-stone-300 flex items-center justify-between gap-3 flex-wrap">
-              <div>
-                <div className="display text-lg">{z.label}</div>
-                <div className="text-xs text-stone-600">{z.drainage} · {z.soilType}</div>
-              </div>
-              <div className={`text-[10px] uppercase tracking-wider px-2 py-1 rounded-sm border ${overwatering ? 'bg-rose-100 text-rose-900 border-rose-300' : 'bg-emerald-100 text-emerald-900 border-emerald-300'}`}>
-                {overwatering ? `${z.currentVsNeed.toFixed(0)}% — overwatering` : `${z.currentVsNeed.toFixed(0)}% of need`}
-              </div>
+      {zones.map(z => (
+        <div key={z.id} className="border border-stone-300 rounded-sm overflow-hidden bg-white">
+          <div className="bg-stone-100 px-4 py-3 border-b border-stone-300 flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <div className="display text-lg">{z.label}</div>
+              <div className="text-xs text-stone-600">{z.drainage} · {z.soilType}</div>
             </div>
-
-            <div className="p-4 md:p-5 space-y-4">
-              {/* Key metrics grid */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div>
-                  <div className="text-[10px] uppercase tracking-wider text-stone-500 mb-0.5">Moen Flo gross</div>
-                  <div className="num font-semibold text-sm">{z.grossPerCycle} gal/cycle</div>
-                  <div className="text-[10px] text-stone-500">at {z.cycleMins}-min</div>
-                </div>
-                <div>
-                  <div className="text-[10px] uppercase tracking-wider text-stone-500 mb-0.5">Efficiency</div>
-                  <div className={`num font-semibold text-sm ${z.efficiency >= 70 ? 'text-emerald-700' : 'text-amber-700'}`}>
-                    ~{z.efficiency}%
-                  </div>
-                  <div className="text-[10px] text-stone-500">range {z.efficiencyRange}</div>
-                </div>
-                <div>
-                  <div className="text-[10px] uppercase tracking-wider text-stone-500 mb-0.5">Effective need</div>
-                  <div className="num font-semibold text-sm">{z.effectiveNeed} gal/wk</div>
-                  <div className="text-[10px] text-rose-700 font-semibold">⚠ do not key</div>
-                </div>
-                <div>
-                  <div className="text-[10px] uppercase tracking-wider text-stone-500 mb-0.5">Mulch</div>
-                  <div className="text-[11px] font-medium leading-tight">{z.mulch}</div>
-                </div>
-              </div>
-
-              {/* Current vs Recommended Rachio inputs — the main event */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-3 border-t border-stone-200">
-                <div className="bg-stone-50 border border-stone-300 rounded-sm p-3">
-                  <div className="text-[10px] uppercase tracking-wider text-stone-500 mb-1">Current Rachio entry</div>
-                  <div className="num font-semibold text-base">{cur.totalMins} min / every {cur.intervalDays}d</div>
-                  <div className="text-[11px] text-stone-600 mt-2 leading-snug">
-                    <div>~{z.currentCyclesPerSession.toFixed(0)} cycles × {z.cycleMins} min/session</div>
-                    <div>Gross: <span className="num font-semibold">{z.currentGrossPerWeek.toFixed(0)} gal/wk</span></div>
-                    <div>Effective: <span className="num font-semibold">{z.currentEffectivePerWeek.toFixed(0)} gal/wk</span> ({z.currentVsNeed.toFixed(0)}% of {z.effectiveNeed})</div>
-                  </div>
-                </div>
-                <div className="bg-emerald-50 border-2 border-emerald-400 rounded-sm p-3">
-                  <div className="text-[10px] uppercase tracking-wider mb-1 font-semibold text-emerald-900">★ Recommended Rachio entry</div>
-                  <div className="num font-bold text-base text-emerald-900">{rec.totalMins} min / every {rec.intervalDays}d</div>
-                  <div className="text-[11px] text-stone-700 mt-2 leading-snug">
-                    <div>{rec.cycles} cycles × {rec.cycleMins} min/session</div>
-                    <div>Gross: <span className="num font-semibold">{z.recGrossPerWeek.toFixed(0)} gal/wk</span></div>
-                    <div>Effective: <span className="num font-semibold">{z.recEffectivePerWeek.toFixed(0)} gal/wk</span> ({z.recVsNeed.toFixed(0)}% of {z.effectiveNeed})</div>
-                    <div className="text-[10px] text-stone-600 mt-1">Range based on efficiency: {z.recEffLow.toFixed(0)}-{z.recEffHigh.toFixed(0)} gal/wk effective ({z.recVsNeedLow.toFixed(0)}-{z.recVsNeedHigh.toFixed(0)}% of need)</div>
-                  </div>
-                  <div className="text-[10px] text-emerald-800 font-semibold mt-2 pt-2 border-t border-emerald-200">
-                    Saves {z.waterSavedGalPerWeek.toFixed(0)} gal/wk ({z.waterSavedPercent.toFixed(0)}% less)
-                  </div>
-                </div>
-              </div>
-
-              {/* Notes */}
-              <div className="pt-3 border-t border-stone-200">
-                <div className="text-[10px] uppercase tracking-wider text-stone-500 mb-2">Notes & findings</div>
-                <ul className="text-xs md:text-sm text-stone-700 space-y-1.5 list-disc ml-5">
-                  {z.notes.map((n, i) => <li key={i}>{n}</li>)}
-                </ul>
-              </div>
+            <div className="text-[10px] uppercase tracking-wider px-2 py-1 rounded-sm border bg-emerald-100 text-emerald-900 border-emerald-300">
+              Peak {z.peak.mins} min every {z.peak.days}d
             </div>
           </div>
-        );
-      })}
-
-      {/* Total savings summary */}
-      <div className="bg-emerald-50 border border-emerald-300 rounded-sm p-4">
-        <div className="text-[11px] uppercase tracking-wider text-emerald-900 mb-1 font-semibold">Total estimated savings (planter zones)</div>
-        <div className="num font-bold text-lg text-emerald-900">{totalSaved.toFixed(0)} gal/week</div>
-        <div className="text-xs text-emerald-800 mt-1">
-          ~{Math.round(totalSaved * 52 / 1000)}k gallons/year if applied year-round. Actual annual savings depend on seasonal need changes (drops 40-60% in fall/winter).
+          <div className="p-4 md:p-5 space-y-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-stone-500 mb-0.5">Moen Flo gross</div>
+                <div className="num font-semibold text-sm">{z.grossPerCycle} gal/cycle</div>
+                <div className="text-[10px] text-stone-500">at {z.cycleMins}-min</div>
+              </div>
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-stone-500 mb-0.5">Efficiency</div>
+                <div className="num font-semibold text-sm">~{z.efficiency}%</div>
+                <div className="text-[10px] text-stone-500">range {z.efficiencyRange}</div>
+              </div>
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-stone-500 mb-0.5">Need at June peak</div>
+                <div className="num font-semibold text-sm">{z.effectiveNeed} gal/wk</div>
+                <div className="text-[10px] text-rose-700 font-semibold">⚠ do not key</div>
+              </div>
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-stone-500 mb-0.5">Mulch</div>
+                <div className="text-[11px] font-medium leading-tight">{z.mulch}</div>
+              </div>
+            </div>
+            <div className="pt-3 border-t border-stone-200">
+              <div className="text-[10px] uppercase tracking-wider text-stone-500 mb-2">Notes & findings</div>
+              <ul className="text-xs md:text-sm text-stone-700 space-y-1.5 list-disc ml-5">
+                {z.notes.map((n, i) => <li key={i}>{n}</li>)}
+              </ul>
+            </div>
+          </div>
         </div>
+      ))}
+
+      {/* Trees and field notes */}
+      <div className="border border-stone-300 rounded-sm bg-white p-4 md:p-5">
+        <div className="display text-lg mb-2">Front tree bags and trees, field notes Nov 2026</div>
+        <ul className="text-xs md:text-sm text-stone-700 space-y-1.5 list-disc ml-5">
+          <li><span className="font-semibold">Tree bags in front:</span> stop them now and restart in April. Modeled rain was about 0.86" across October and Nov 1-4, and the front planter soil was already wet.</li>
+          <li><span className="font-semibold">Plum trees in front:</span> still no new leaves. Scratch tests look similar to before: some secondary branches green, some brown. The cause is not known, so watch it before changing anything.</li>
+          <li><span className="font-semibold">Back maple:</span> the old tree died and was replaced.</li>
+          <li><span className="font-semibold">Red top hedge:</span> grew only when hand-watered through the summer (every 5 days), a direct correlation.</li>
+        </ul>
       </div>
 
       {/* Monitoring & adjustment protocol */}
@@ -3726,18 +4085,6 @@ function DataTab({ exportData, importData, stats }) {
     }
   };
 
-  const handleDownload = () => {
-    const blob = new Blob([exportText], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `belburn-garden-${new Date().toISOString().slice(0, 10)}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
   const handleImport = () => {
     setImportResult(null);
     setShowConfirm(true);
@@ -3802,12 +4149,6 @@ function DataTab({ exportData, importData, stats }) {
                 className="px-3 py-1.5 text-xs uppercase tracking-wider border border-stone-400 rounded-sm bg-white hover:bg-stone-100 transition"
               >
                 {copied ? '✓ Copied' : 'Copy to clipboard'}
-              </button>
-              <button
-                onClick={handleDownload}
-                className="px-3 py-1.5 text-xs uppercase tracking-wider border border-stone-400 rounded-sm bg-white hover:bg-stone-100 transition"
-              >
-                Download as .json
               </button>
             </div>
             <textarea

@@ -252,6 +252,12 @@ For the most natural editing experience, paste it into Claude as an artifact and
 
 ---
 
+## Update, November 2026
+
+After summer 2026 the lawn browned, so the lawn and planter sections were rebuilt around what actually happened. The lawn now gives minutes and spacing by month for each zone, sized on catch-can readings and a higher peak target (1.1 in/wk). A Rachio overlay table compares what Rachio's own Seasonal Shift will run against the month's need and says where to add or cut. The planters follow the same method. Field findings and the Rachio runtimes behind them are in `lawn-watering-findings-2026.md`.
+
+---
+
 ## License
 
 MIT. Take it, fork it, run with it.
